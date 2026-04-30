@@ -28,3 +28,394 @@
   background: #111827;
   color: #ffffff;
 }
+
+.tutorialOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100500;
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) minmax(280px, 360px);
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  padding: 28px;
+  background: rgb(250 250 250 / 82%);
+  backdrop-filter: blur(8px);
+  color: #111827;
+}
+
+.tutorialDemo {
+  position: relative;
+  width: min(420px, 82vw);
+  aspect-ratio: 1.25;
+  border: 2px solid rgb(17 24 39 / 16%);
+  border-radius: 10px;
+  background:
+    linear-gradient(to right, rgb(17 24 39 / 8%) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(17 24 39 / 8%) 1px, transparent 1px),
+    rgb(255 255 255 / 72%);
+  background-size: 34px 34px;
+  box-shadow: 0 20px 55px rgb(0 0 0 / 18%);
+  overflow: hidden;
+}
+
+.tutorialRectangle {
+  position: absolute;
+  top: 34%;
+  left: 28%;
+  width: 168px;
+  height: 118px;
+  border: 5px solid #111827;
+  border-radius: 8px;
+  background: rgb(20 184 166 / 68%);
+  box-shadow: 0 18px 28px rgb(0 0 0 / 24%);
+  transform-origin: center;
+}
+
+.tutorialDepthShadow {
+  position: absolute;
+  left: 28%;
+  top: 72%;
+  width: 178px;
+  height: 28px;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgb(0 0 0 / 38%), transparent 70%);
+  filter: blur(8px);
+  opacity: 0.35;
+}
+
+.tutorialHandle {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 4px solid #ffffff;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 2px #111827;
+  opacity: 0;
+}
+
+.tutorialHandleTopLeft {
+  top: -14px;
+  left: -14px;
+}
+
+.tutorialHandleTopRight {
+  top: -14px;
+  right: -14px;
+}
+
+.tutorialHandleBottomLeft {
+  bottom: -14px;
+  left: -14px;
+}
+
+.tutorialHandleBottomRight {
+  right: -14px;
+  bottom: -14px;
+}
+
+.tutorialFinger,
+.tutorialDeletePulse {
+  position: absolute;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  border: 7px solid #ffffff;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 2px #111827, 0 0 0 18px rgb(239 68 68 / 18%);
+}
+
+.tutorialFingerOne {
+  left: 34%;
+  top: 38%;
+}
+
+.tutorialFingerTwo {
+  left: 61%;
+  top: 56%;
+  opacity: 0;
+}
+
+.tutorialDeletePulse {
+  left: 54%;
+  top: 40%;
+  opacity: 0;
+  transform: scale(0.72);
+}
+
+.tutorialDemo[data-step="drag"] .tutorialRectangle {
+  animation: tutorialRectangleDrag 2.4s ease-in-out infinite;
+}
+
+.tutorialDemo[data-step="drag"] .tutorialFingerOne {
+  animation: tutorialFingerDrag 2.4s ease-in-out infinite;
+}
+
+.tutorialDemo[data-step="resize"] .tutorialRectangle {
+  animation: tutorialRectangleResize 2.5s ease-in-out infinite;
+}
+
+.tutorialDemo[data-step="resize"] .tutorialHandle {
+  opacity: 1;
+}
+
+.tutorialDemo[data-step="resize"] .tutorialFingerOne {
+  animation: tutorialResizePull 2.5s ease-in-out infinite;
+}
+
+.tutorialDemo[data-step="resize"] .tutorialFingerOne {
+  left: calc(28% + 146px);
+  top: calc(34% + 96px);
+}
+
+.tutorialDemo[data-step="zoom"] .tutorialRectangle {
+  animation: tutorialRectangleZoom 2.6s ease-in-out infinite;
+}
+
+.tutorialDemo[data-step="zoom"] .tutorialFingerOne {
+  animation: tutorialZoomFingerOne 2.6s ease-in-out infinite;
+}
+
+.tutorialDemo[data-step="zoom"] .tutorialFingerTwo {
+  opacity: 1;
+  animation: tutorialZoomFingerTwo 2.6s ease-in-out infinite;
+}
+
+.tutorialDemo[data-step="depth"] .tutorialRectangle {
+  animation: tutorialRectangleDepth 2.4s ease-in-out infinite;
+}
+
+.tutorialDemo[data-step="depth"] .tutorialDepthShadow {
+  animation: tutorialShadowDepth 2.4s ease-in-out infinite;
+}
+
+.tutorialDemo[data-step="depth"] .tutorialFingerOne {
+  animation: tutorialDepthFinger 2.4s ease-in-out infinite;
+}
+
+.tutorialDemo[data-step="delete"] .tutorialRectangle {
+  animation: tutorialRectangleDelete 2.2s ease-in-out infinite;
+}
+
+.tutorialDemo[data-step="delete"] .tutorialFingerOne {
+  opacity: 0;
+}
+
+.tutorialDemo[data-step="delete"] .tutorialDeletePulse {
+  animation: tutorialDeletePulse 2.2s ease-in-out infinite;
+}
+
+.tutorialCopy {
+  display: grid;
+  gap: 12px;
+  width: min(360px, 86vw);
+  padding: 22px;
+  border: 2px solid #111827;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 20%);
+}
+
+.tutorialCount {
+  width: max-content;
+  border: 2px solid #111827;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #dcfce7;
+  color: #14532d;
+  font: 900 12px/1 Arial, Helvetica, sans-serif;
+}
+
+.tutorialCopy h2 {
+  margin: 0;
+  font: 900 28px/1 Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
+}
+
+.tutorialCopy p {
+  margin: 0;
+  color: #374151;
+  font: 700 15px/1.35 Arial, Helvetica, sans-serif;
+}
+
+.tutorialDots {
+  display: flex;
+  gap: 7px;
+}
+
+.tutorialDots span {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #d1d5db;
+}
+
+.tutorialDots .tutorialDotActive {
+  width: 24px;
+  background: #111827;
+}
+
+.tutorialActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.tutorialPrimaryButton,
+.tutorialSecondaryButton {
+  min-height: 42px;
+  border: 2px solid #111827;
+  border-radius: 8px;
+  font: 900 14px/1 Arial, Helvetica, sans-serif;
+  cursor: pointer;
+  padding: 0 14px;
+}
+
+.tutorialPrimaryButton {
+  background: #111827;
+  color: #ffffff;
+}
+
+.tutorialSecondaryButton {
+  background: #ffffff;
+  color: #111827;
+}
+
+@keyframes tutorialRectangleDrag {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(58px, 26px);
+  }
+}
+
+@keyframes tutorialFingerDrag {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(58px, 26px) scale(0.9);
+  }
+}
+
+@keyframes tutorialRectangleResize {
+  0%, 100% {
+    width: 168px;
+    height: 118px;
+  }
+  50% {
+    width: 220px;
+    height: 150px;
+  }
+}
+
+@keyframes tutorialResizePull {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(52px, 32px);
+  }
+}
+
+@keyframes tutorialRectangleZoom {
+  0%, 100% {
+    transform: scale(0.82);
+  }
+  50% {
+    transform: scale(1.18);
+  }
+}
+
+@keyframes tutorialZoomFingerOne {
+  0%, 100% {
+    transform: translate(28px, 20px);
+  }
+  50% {
+    transform: translate(-28px, -16px);
+  }
+}
+
+@keyframes tutorialZoomFingerTwo {
+  0%, 100% {
+    transform: translate(-26px, -18px);
+  }
+  50% {
+    transform: translate(30px, 20px);
+  }
+}
+
+@keyframes tutorialRectangleDepth {
+  0%, 100% {
+    transform: translateY(16px) scale(0.88);
+    filter: brightness(0.82);
+  }
+  50% {
+    transform: translateY(-18px) scale(1.14);
+    filter: brightness(1.08);
+  }
+}
+
+@keyframes tutorialShadowDepth {
+  0%, 100% {
+    transform: translateY(-4px) scale(0.78);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateY(22px) scale(1.5);
+    opacity: 0.55;
+  }
+}
+
+@keyframes tutorialDepthFinger {
+  0%, 100% {
+    transform: translateY(32px) scale(0.88);
+  }
+  50% {
+    transform: translateY(-24px) scale(1.05);
+  }
+}
+
+@keyframes tutorialRectangleDelete {
+  0%, 55%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  70%, 85% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+}
+
+@keyframes tutorialDeletePulse {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  45%, 64% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 760px) {
+  .tutorialOverlay {
+    grid-template-columns: 1fr;
+    align-content: center;
+    gap: 18px;
+    padding: 18px;
+  }
+
+  .tutorialDemo {
+    width: min(340px, 90vw);
+    justify-self: center;
+  }
+
+  .tutorialCopy {
+    justify-self: center;
+  }
+}

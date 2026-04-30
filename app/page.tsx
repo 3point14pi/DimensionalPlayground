@@ -90,11 +90,11 @@ const handActions = [
     text: "Grab, move, resize, and create shapes.",
   },
   {
-    title: "Middle pinch",
+    title: "Middle finger touch thumb",
     text: "Push shapes forward and backward in depth.",
   },
   {
-    title: "Pinky pinch",
+    title: "Pinky touch thumb",
     text: "Delete a shape without switching tools.",
   },
 ];

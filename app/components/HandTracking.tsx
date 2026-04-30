@@ -84,6 +84,10 @@ interface Shape {
   trianglePoints?: TrianglePoints;
 }
 
+interface HandTrackingProps {
+  onReplayTutorial?: () => void;
+}
+
 function isShapeType(value: unknown): value is ShapeType {
   return value === "rectangle" || value === "circle" || value === "triangle";
 }
@@ -331,7 +335,7 @@ declare global {
   }
 }
 
-export default function HandTracking() {
+export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -377,7 +381,6 @@ export default function HandTracking() {
   const [fistCountdown, setFistCountdown] = useState<number | null>(null);
   const [hoveredToolbarAction, setHoveredToolbarAction] = useState<ToolbarAction | null>(null);
   const [isDeleteMode, setIsDeleteMode] = useState(false);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [hasLoadedSavedShapes, setHasLoadedSavedShapes] = useState(false);
 
@@ -1362,30 +1365,15 @@ export default function HandTracking() {
         <button
           className="pinch-help-button"
           type="button"
-          aria-label="Show hand controls"
-          aria-expanded={isHelpOpen}
+          aria-label="Open tutorial"
           onPointerDown={(event) => {
             event.stopPropagation();
-            setIsHelpOpen((isOpen) => !isOpen);
+            onReplayTutorial?.();
           }}
         >
           ?
         </button>
       </div>
-      {isHelpOpen && (
-        <div className="pinch-help-panel" role="dialog" aria-label="Hand controls">
-          <strong>Hand controls</strong>
-          <span>1.  pinch a shape to drag it.</span>
-          <span>2. Index pinch a corner or edge point to resize it.</span>
-          <span>3. Use two index pinches on the same shape to zoom in or out.</span>
-          <span>4. Middle pinch a shape, then move your hand forward or back to change z axis.</span>
-          <span>5. Pinky pinch a shape to delete it.</span>
-          <span>6. Make two fists for 3 seconds to clear the playground.</span>
-          <button type="button" onClick={() => setIsHelpOpen(false)}>
-            Got it
-          </button>
-        </div>
-      )}
       {fistCountdown !== null && (
         <div className="fist-countdown">
           {fistCountdown > 0 ? `Clearing in ${fistCountdown}` : "Cleared"}
