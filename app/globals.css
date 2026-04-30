@@ -23,4 +23,384 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+.canvas-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background-color: #fafafa;
+  overflow: hidden;
+}
+
+.grid-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(to right, #e5e5e5 1px, transparent 1px),
+    linear-gradient(to bottom, #e5e5e5 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+.hand-tracking-container {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.shape-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  perspective: 900px;
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+.hand-tracking-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.pinch-indicator {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  z-index: 100100;
+  transform: translateX(-50%);
+  border: 2px solid #111827;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 88%);
+  color: #111827;
+  font: 800 13px/1 Arial, Helvetica, sans-serif;
+  padding: 10px 14px;
+  pointer-events: none;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 18%);
+}
+
+.pinch-indicator-active {
+  border-color: #16a34a;
+  background: #dcfce7;
+  color: #14532d;
+}
+
+.fist-countdown {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  z-index: 100200;
+  transform: translateX(-50%);
+  border: 2px solid #7f1d1d;
+  border-radius: 8px;
+  background: rgb(254 226 226 / 94%);
+  color: #7f1d1d;
+  font: 900 14px/1 Arial, Helvetica, sans-serif;
+  padding: 10px 14px;
+  pointer-events: none;
+  box-shadow: 0 10px 24px rgb(0 0 0 / 20%);
+}
+
+.shape-toolbar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  z-index: 100100;
+  display: flex;
+  gap: 10px;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  padding: 10px;
+  border: 2px solid #111827;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 86%);
+  box-shadow: 0 14px 32px rgb(0 0 0 / 22%);
+}
+
+.shape-toolbar button {
+  min-width: 104px;
+  height: 48px;
+  border: 2px solid #111827;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  font: 800 14px/1 Arial, Helvetica, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 18%);
+  padding: 0 16px;
+}
+
+.shape-toolbar button:hover,
+.shape-toolbar-button-active {
+  background: #111827;
+  color: #ffffff;
+}
+
+.delete-mode-button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 100100;
+  width: 96px;
+  height: 48px;
+  border: 2px solid #7f1d1d;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #7f1d1d;
+  font: 800 14px/1 Arial, Helvetica, sans-serif;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 18%);
+}
+
+.delete-mode-button:hover,
+.delete-mode-button-hovered,
+.delete-mode-button-active {
+  border-color: #dc2626;
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.delete-mode-button-active {
+  box-shadow:
+    0 0 0 6px rgb(220 38 38 / 18%),
+    0 8px 22px rgb(0 0 0 / 18%);
+}
+
+.shape-box {
+  position: fixed;
+  transform-style: preserve-3d;
+  transform-origin: center;
+  pointer-events: auto;
+}
+
+.shape-box::before {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -28px;
+  height: 34px;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgb(0 0 0 / 78%) 0%, rgb(0 0 0 / 34%) 42%, transparent 72%);
+  filter: blur(8px);
+  opacity: var(--shape-ground-shadow-opacity);
+  transform: translateY(var(--shape-ground-shadow-y)) scale(var(--shape-ground-shadow-scale));
+  transform-origin: center;
+  z-index: -1;
+}
+
+.shape-box-triangle::before {
+  left: 22%;
+  right: 22%;
+  bottom: -14px;
+  height: 24px;
+  opacity: calc(var(--shape-ground-shadow-opacity) * 0.72);
+  transform: translateY(calc(var(--shape-ground-shadow-y) * 0.28)) scale(calc(var(--shape-ground-shadow-scale) * 0.58));
+}
+
+.shape-fill {
+  position: absolute;
+  inset: 0;
+  border: 4px solid #111827;
+  background: rgb(20 184 166 / 72%);
+  outline: 4px solid #ffffff;
+  box-shadow:
+    0 var(--shape-shadow-y) var(--shape-shadow-blur) rgb(0 0 0 / var(--shape-shadow-alpha)),
+    0 4px 10px rgb(0 0 0 / 28%),
+    inset 0 0 0 1px rgb(255 255 255 / 35%);
+  filter: brightness(var(--shape-brightness));
+  transform: translateZ(0);
+}
+
+.shape-fill-rectangle {
+  border-radius: 8px;
+}
+
+.shape-fill-circle {
+  border-radius: 50%;
+}
+
+.shape-fill-triangle {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  filter: none;
+  outline: 0;
+  overflow: visible;
+}
+
+.shape-triangle-outline {
+  fill: none;
+  stroke: #ffffff;
+  stroke-linejoin: round;
+  stroke-width: 16;
+}
+
+.shape-triangle-main {
+  fill: rgba(20, 184, 166, 0.72);
+  stroke: #111827;
+  stroke-linejoin: round;
+  stroke-width: 8;
+}
+
+.shape-box-active .shape-fill {
+  border-color: #dc2626;
+  background: rgb(220 38 38 / 58%);
+  box-shadow:
+    0 var(--shape-shadow-y) var(--shape-shadow-blur) rgb(0 0 0 / var(--shape-shadow-alpha)),
+    0 0 0 6px rgb(220 38 38 / 22%),
+    0 4px 10px rgb(0 0 0 / 28%),
+    inset 0 0 0 1px rgb(255 255 255 / 35%);
+}
+
+.shape-box-active .shape-fill-triangle {
+  background: transparent;
+  box-shadow: none;
+}
+
+.shape-box-active .shape-triangle-main {
+  fill: rgba(220, 38, 38, 0.58);
+  stroke: #dc2626;
+}
+
+.shape-box-delete-mode .shape-fill {
+  border-style: dashed;
+}
+
+.shape-box-delete-mode .shape-z-label {
+  border-color: #dc2626;
+  color: #7f1d1d;
+}
+
+.shape-box-active::before {
+  opacity: min(0.95, calc(var(--shape-ground-shadow-opacity) + 0.18));
+}
+
+.shape-z-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  transform: translate(-50%, -50%) translateZ(4px);
+  border: 2px solid #111827;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 82%);
+  color: #111827;
+  font: 800 12px/1 Arial, Helvetica, sans-serif;
+  opacity: 0;
+  padding: 7px 9px;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 18%);
+  transition: opacity 120ms ease;
+}
+
+.shape-box-hand-hover .shape-z-label,
+.shape-box-active .shape-z-label {
+  opacity: 1;
+}
+
+.resize-corner {
+  position: absolute;
+  box-sizing: border-box;
+  width: 34px;
+  height: 34px;
+  border: 4px solid #ffffff;
+  border-radius: 50%;
+  background: #2563eb;
+  opacity: 0;
+  box-shadow:
+    0 0 0 10px rgb(37 99 235 / 18%),
+    0 8px 20px rgb(0 0 0 / 28%);
+  transform: scale(0.72);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.resize-corner::after {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.resize-corner-top-left {
+  top: -17px;
+  left: -17px;
+}
+
+.resize-corner-top {
+  top: -17px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.72);
+}
+
+.resize-corner-top-right {
+  top: -17px;
+  right: -17px;
+}
+
+.resize-corner-right {
+  top: 50%;
+  right: -17px;
+  transform: translateY(-50%) scale(0.72);
+}
+
+.resize-corner-bottom-left {
+  bottom: -17px;
+  left: -17px;
+}
+
+.resize-corner-bottom-right {
+  right: -17px;
+  bottom: -17px;
+}
+
+.resize-corner-free {
+  right: auto;
+  bottom: auto;
+  transform: scale(0.72);
+}
+
+.shape-box-hand-hover .resize-corner,
+.shape-box-active .resize-corner {
+  background: #dc2626;
+  opacity: 1;
+  box-shadow:
+    0 0 0 12px rgb(220 38 38 / 20%),
+    0 8px 20px rgb(0 0 0 / 28%);
+  transform: scale(1);
+}
+
+.shape-box-hand-hover .resize-corner-top,
+.shape-box-active .resize-corner-top {
+  transform: translateX(-50%) scale(1);
+}
+
+.shape-box-triangle.shape-box-hand-hover .resize-corner-top,
+.shape-box-triangle.shape-box-active .resize-corner-top {
+  transform: scale(1);
+}
+
+.shape-box-triangle.shape-box-hand-hover .resize-corner-free,
+.shape-box-triangle.shape-box-active .resize-corner-free {
+  transform: scale(1);
+}
+
+.shape-box-hand-hover .resize-corner-right,
+.shape-box-active .resize-corner-right {
+  transform: translateY(-50%) scale(1);
 }

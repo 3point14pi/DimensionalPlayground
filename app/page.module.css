@@ -1,0 +1,109 @@
+.buttonGroup {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    min-height: 100vh;
+}
+
+.handCanvas {
+    position: fixed;
+    inset: 0;
+    z-index: 3;
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+}
+
+.actionPanel {
+    position: absolute;
+    top: calc(50% - 190px);
+    left: 50%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(170px, 1fr));
+    gap: 14px;
+    width: min(760px, calc(100vw - 40px));
+    transform: translateX(-50%);
+}
+
+.signingActionPanel {
+    grid-template-columns: minmax(240px, 420px);
+    justify-content: center;
+    width: min(460px, calc(100vw - 40px));
+    text-align: center;
+}
+
+.actionCard {
+    display: grid;
+    gap: 8px;
+    min-height: 112px;
+    align-content: center;
+    border: 2px solid #111827;
+    border-radius: 8px;
+    background: rgb(255 255 255 / 90%);
+    color: #111827;
+    padding: 16px;
+    box-shadow: 0 10px 28px rgb(0 0 0 / 18%);
+}
+
+.actionCard strong {
+    font: 800 15px/1 Arial, Helvetica, sans-serif;
+}
+
+.actionCard span {
+    font: 700 13px/1.35 Arial, Helvetica, sans-serif;
+}
+
+.button {
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    height: 10vh;
+    width: 30vh;
+    background-color: #71b4ff;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-decoration: none;
+    box-shadow: 0 10px 24px rgb(0 0 0 / 16%);
+}
+
+.buttonProgress {
+    position: absolute;
+    inset: 0;
+    background: rgb(255 255 255 / 42%);
+    transform: scaleX(var(--pinch-progress, 0));
+    transform-origin: left center;
+    transition: transform 120ms ease;
+}
+
+.buttonLabel {
+    position: relative;
+    z-index: 1;
+}
+
+.button:hover,
+.buttonActive {
+    background-color: #0070f3;
+    box-shadow:
+        0 0 0 6px rgb(0 112 243 / 18%),
+        0 12px 28px rgb(0 0 0 / 22%);
+}
+
+@media (max-width: 680px) {
+    .buttonGroup {
+        flex-direction: column;
+    }
+
+    .actionPanel {
+        top: 56px;
+        grid-template-columns: 1fr;
+        width: min(320px, calc(100vw - 32px));
+    }
+}
