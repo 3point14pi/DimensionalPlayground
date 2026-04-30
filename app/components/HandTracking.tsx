@@ -28,11 +28,12 @@ const PINKY_MCP = 17;
 const PINKY_TIP = 20;
 const INDEX_PINCH_THRESHOLD = 15;
 const MIDDLE_PINCH_THRESHOLD = 30;
-const PINKY_PINCH_THRESHOLD = 10;
-const PINCH_RELEASE_PADDING = 10;
+const RING_PINCH_THRESHOLD = 15;
+const PINKY_PINCH_THRESHOLD = 55;
+const PINCH_RELEASE_PADDING = 5;
 const HAND_SCALE_REFERENCE_SIZE = 90;
 const MIN_PINCH_SCALE = 0.5;
-const MAX_PINCH_SCALE = 2.5;
+const MAX_PINCH_SCALE = 3;
 const FIST_CLEAR_DURATION_MS = 3000;
 const CORNER_HIT_SIZE = 72;
 const MIN_SHAPE_SIZE = 40;
@@ -42,6 +43,7 @@ const MAX_SHAPE_Z = 50;
 const GESTURE_SMOOTHING = 0.28;
 const GESTURE_DEADZONE = 6;
 const Z_DEPTH_SENSITIVITY = 2000;
+const HAND_TRACKING_OVERSCAN = 0.05;
 const SHAPES_COOKIE_NAME = "dimensional-playground-shapes";
 const SHAPES_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 const TRIANGLE_TOP_X = 0.5;
@@ -55,7 +57,7 @@ const TRIANGLE_PADDING = 16;
 type ResizeHandle = "top-left" | "top-right" | "bottom-left" | "bottom-right" | "top" | "right";
 type ShapeType = "rectangle" | "circle" | "triangle";
 type ToolbarAction = ShapeType;
-type PinchFinger = "index" | "middle" | "pinky";
+type PinchFinger = "index" | "middle" | "ring" | "pinky";
 type ShapeStyle = React.CSSProperties & {
   "--shape-brightness": string;
   "--shape-ground-shadow-opacity": string;
@@ -86,7 +88,10 @@ interface Shape {
 
 interface HandTrackingProps {
   onReplayTutorial?: () => void;
+  onTutorialGesture?: (gesture: TutorialGesture) => void;
 }
+
+export type TutorialGesture = "drag" | "resize" | "zoom" | "depth" | "duplicate" | "delete";
 
 function isShapeType(value: unknown): value is ShapeType {
   return value === "rectangle" || value === "circle" || value === "triangle";
@@ -335,7 +340,7 @@ declare global {
   }
 }
 
-export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
+export default function HandTracking({ onReplayTutorial, onTutorialGesture }: HandTrackingProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -356,6 +361,7 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
     startShape: Shape;
   } | null>(null);
   const toolbarPinchStartedRef = useRef(false);
+  const duplicatePinchStartedRef = useRef(false);
   const deletePinchStartedRef = useRef(false);
   const isDeleteModeRef = useRef(false);
   const gestureStartPointsRef = useRef<Array<PinchPoint | null>>([null, null]);
@@ -368,10 +374,12 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
   const pinchLocksRef = useRef<Record<PinchFinger, boolean[]>>({
     index: [false, false],
     middle: [false, false],
+    ring: [false, false],
     pinky: [false, false],
   });
   const activeShapeIdsRef = useRef<number[]>([]);
   const hoveredShapeIdsRef = useRef<number[]>([]);
+  const onTutorialGestureRef = useRef(onTutorialGesture);
   const fistStartTimeRef = useRef<number | null>(null);
   const fistClearedRef = useRef(false);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -383,6 +391,14 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [hasLoadedSavedShapes, setHasLoadedSavedShapes] = useState(false);
+
+  useEffect(() => {
+    onTutorialGestureRef.current = onTutorialGesture;
+  }, [onTutorialGesture]);
+
+  function reportTutorialGesture(gesture: TutorialGesture) {
+    onTutorialGestureRef.current?.(gesture);
+  }
 
 
 // Defines the shapes
@@ -483,9 +499,13 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
     }
 
     function getCanvasPoint(landmark: HandLandmark, width: number, height: number) {
+      const overscan = Math.max(width, height) * HAND_TRACKING_OVERSCAN;
+      const virtualWidth = width + overscan * 2;
+      const virtualHeight = height + overscan * 2;
+
       return {
-        x: (1 - landmark.x) * width,
-        y: landmark.y * height,
+        x: (1 - landmark.x) * virtualWidth - overscan,
+        y: landmark.y * virtualHeight - overscan,
       };
     }
 
@@ -588,8 +608,13 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
 
     function moveShapeFromPoint(point: PinchPoint, handIndex: number, shapeId: number) {
       const startShape = gestureStartShapesRef.current[handIndex];
+      const startPoint = gestureStartPointsRef.current[handIndex];
       const moveOffset = moveOffsetsRef.current[handIndex];
-      if (!startShape || !moveOffset) return;
+      if (!startShape || !startPoint || !moveOffset) return;
+
+      if (Math.hypot(point.x - startPoint.x, point.y - startPoint.y) >= 72) {
+        reportTutorialGesture("drag");
+      }
 
       setShapes((currentShapes) => currentShapes.map((shape) => {
         if (shape.id !== shapeId) return shape;
@@ -609,6 +634,7 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
     }
 
     function deleteShape(shapeId: number) {
+      reportTutorialGesture("delete");
       setShapes((currentShapes) => currentShapes.filter((shape) => shape.id !== shapeId));
       activeGesturesRef.current = activeGesturesRef.current.map((gesture) => (
         gesture?.shapeId === shapeId ? null : gesture
@@ -627,6 +653,33 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
         activeShapeIdsRef.current = nextActiveShapeIds;
         setActiveShapeIds(nextActiveShapeIds);
       }
+    }
+
+    function duplicateShape(shapeId: number) {
+      const shapeToDuplicate = shapesRef.current.find((shape) => shape.id === shapeId);
+      if (!shapeToDuplicate) return;
+
+      const offset = 28;
+      const nextWidth = shapeToDuplicate.width;
+      const nextHeight = shapeToDuplicate.height;
+      const duplicateShape = {
+        ...shapeToDuplicate,
+        id: nextShapeIdRef.current++,
+        left: Math.min(
+          window.innerWidth - SCREEN_MARGIN - nextWidth,
+          Math.max(SCREEN_MARGIN, shapeToDuplicate.left + offset)
+        ),
+        top: Math.min(
+          window.innerHeight - SCREEN_MARGIN - nextHeight,
+          Math.max(SCREEN_MARGIN, shapeToDuplicate.top + offset)
+        ),
+        trianglePoints: shapeToDuplicate.trianglePoints
+          ? (shapeToDuplicate.trianglePoints.map((point) => ({ ...point })) as TrianglePoints)
+          : undefined,
+      };
+
+      reportTutorialGesture("duplicate");
+      setShapes((currentShapes) => [...currentShapes, duplicateShape]);
     }
 
     function clearAllShapes() {
@@ -650,13 +703,18 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
       const startShape = zGestureStartShapesRef.current[handIndex];
       const startPoint = zGestureStartPointsRef.current[handIndex];
       if (!startShape || !startPoint) return;
+      const nextZ = getShapeZ(point, startPoint, startShape);
+
+      if (Math.abs(nextZ - startShape.z) >= 10) {
+        reportTutorialGesture("depth");
+      }
 
       setShapes((currentShapes) => currentShapes.map((shape) => {
         if (shape.id !== shapeId) return shape;
 
         return {
           ...shape,
-          z: getShapeZ(point, startPoint, startShape),
+          z: nextZ,
         };
       }));
     }
@@ -683,6 +741,10 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
       let nextHeight = startShape.height;
 
       if (startShape.type === "triangle") {
+        if (Math.hypot(dx, dy) >= 46) {
+          reportTutorialGesture("resize");
+        }
+
         const pointIndex = handle === "top"
           ? 0
           : handle === "bottom-left"
@@ -756,6 +818,10 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
         }
       }
 
+      if (Math.hypot(dx, dy) >= 46) {
+        reportTutorialGesture("resize");
+      }
+
       setShapes((currentShapes) => currentShapes.map((shape) => {
         if (shape.id !== shapeId) return shape;
 
@@ -821,6 +887,10 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
       const centerOffsetX = zoomGesture.startCenter.x - zoomGesture.startShape.left;
       const centerOffsetY = zoomGesture.startCenter.y - zoomGesture.startShape.top;
 
+      if (Math.abs(scale - 1) >= 0.22) {
+        reportTutorialGesture("zoom");
+      }
+
       setShapes((currentShapes) => currentShapes.map((shape) => {
         if (shape.id !== zoomGesture.shapeId) return shape;
 
@@ -871,6 +941,7 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
       return {
         isPinching: pinchDistance < activeThreshold,
         pinchPoint,
+        pinchDistance,
       };
     }
 
@@ -898,6 +969,7 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
 
       const indexPinchPoints: Array<PinchPoint | null> = [null, null];
       const middlePinchPoints: Array<PinchPoint | null> = [null, null];
+      const ringPinchPoints: Array<PinchPoint | null> = [null, null];
       const pinkyPinchPoints: Array<PinchPoint | null> = [null, null];
       const indexHoverPoints: Array<{ x: number; y: number } | null> = [null, null];
       let detectedHandCount = 0;
@@ -952,6 +1024,14 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
               width,
               height
             );
+            const ringPinch = getPinchState(
+              landmarks,
+              RING_TIP,
+              RING_PINCH_THRESHOLD,
+              pinchLocksRef.current.ring[handIndex],
+              width,
+              height
+            );
             const pinkyPinch = getPinchState(
               landmarks,
               PINKY_TIP,
@@ -963,14 +1043,27 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
 
             pinchLocksRef.current.index[handIndex] = indexPinch.isPinching;
             pinchLocksRef.current.middle[handIndex] = middlePinch.isPinching;
+            pinchLocksRef.current.ring[handIndex] = ringPinch.isPinching;
             pinchLocksRef.current.pinky[handIndex] = pinkyPinch.isPinching;
 
-            if (pinkyPinch.isPinching) {
-              pinkyPinchPoints[handIndex] = pinkyPinch.pinchPoint;
-            } else if (middlePinch.isPinching) {
-              middlePinchPoints[handIndex] = middlePinch.pinchPoint;
-            } else if (indexPinch.isPinching) {
-              indexPinchPoints[handIndex] = indexPinch.pinchPoint;
+            const activePinches = [
+              { finger: "index" as const, state: indexPinch },
+              { finger: "middle" as const, state: middlePinch },
+              { finger: "ring" as const, state: ringPinch },
+              { finger: "pinky" as const, state: pinkyPinch },
+            ]
+              .filter(({ state }) => state.isPinching)
+              .sort((firstPinch, secondPinch) => firstPinch.state.pinchDistance - secondPinch.state.pinchDistance);
+            const closestPinch = activePinches[0];
+
+            if (closestPinch?.finger === "pinky") {
+              pinkyPinchPoints[handIndex] = closestPinch.state.pinchPoint;
+            } else if (closestPinch?.finger === "ring") {
+              ringPinchPoints[handIndex] = closestPinch.state.pinchPoint;
+            } else if (closestPinch?.finger === "middle") {
+              middlePinchPoints[handIndex] = closestPinch.state.pinchPoint;
+            } else if (closestPinch?.finger === "index") {
+              indexPinchPoints[handIndex] = closestPinch.state.pinchPoint;
             }
           }
         }
@@ -979,6 +1072,7 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
       for (let handIndex = detectedHandCount; handIndex < indexPinchPoints.length; handIndex++) {
         pinchLocksRef.current.index[handIndex] = false;
         pinchLocksRef.current.middle[handIndex] = false;
+        pinchLocksRef.current.ring[handIndex] = false;
         pinchLocksRef.current.pinky[handIndex] = false;
       }
 
@@ -1005,8 +1099,9 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
 
       const hasAnyIndexPinch = indexPinchPoints.some(Boolean);
       const hasAnyMiddlePinch = middlePinchPoints.some(Boolean);
+      const hasAnyRingPinch = ringPinchPoints.some(Boolean);
       const hasAnyPinkyPinch = pinkyPinchPoints.some(Boolean);
-      const hasAnyPinch = hasAnyIndexPinch || hasAnyMiddlePinch || hasAnyPinkyPinch;
+      const hasAnyPinch = hasAnyIndexPinch || hasAnyMiddlePinch || hasAnyRingPinch || hasAnyPinkyPinch;
       const nextHoveredShapeIds = Array.from(new Set(indexHoverPoints
         .map((point) => (point ? getShapeAtPoint(point)?.id ?? null : null))
         .filter((shapeId): shapeId is number => shapeId !== null)))
@@ -1028,6 +1123,7 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
         smoothedMiddlePinchPointsRef.current = [null, null];
         zoomGestureRef.current = null;
         toolbarPinchStartedRef.current = false;
+        duplicatePinchStartedRef.current = false;
         deletePinchStartedRef.current = false;
         setHoveredToolbarAction(null);
       }
@@ -1041,6 +1137,7 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
         point ? smoothPoint(point, handIndex, smoothedMiddlePinchPointsRef) : null
       ));
       const primaryPinchPoint = smoothedPinchPoints.find(Boolean) ?? null;
+      const primaryRingPoint = ringPinchPoints.find(Boolean) ?? null;
       const primaryPinkyPoint = pinkyPinchPoints.find(Boolean) ?? null;
       const hasLockedShapeGesture = activeGesturesRef.current.some(Boolean) || Boolean(zoomGestureRef.current);
       const toolbarAction = primaryPinchPoint && !hasLockedShapeGesture
@@ -1053,6 +1150,15 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
         if (!toolbarPinchStartedRef.current) {
           toolbarPinchStartedRef.current = true;
           addShape(toolbarAction);
+        }
+      }
+
+      if (primaryRingPoint && !duplicatePinchStartedRef.current) {
+        const shape = getShapeAtPoint(primaryRingPoint);
+
+        if (shape) {
+          duplicatePinchStartedRef.current = true;
+          duplicateShape(shape.id);
         }
       }
 
@@ -1207,6 +1313,10 @@ export default function HandTracking({ onReplayTutorial }: HandTrackingProps) {
 
       if (!hasAnyPinkyPinch && !(primaryPinchPoint && isDeleteModeRef.current)) {
         deletePinchStartedRef.current = false;
+      }
+
+      if (!hasAnyRingPinch) {
+        duplicatePinchStartedRef.current = false;
       }
 
       if (!hasAnyIndexPinch) {

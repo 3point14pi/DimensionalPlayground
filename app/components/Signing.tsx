@@ -65,15 +65,20 @@ const DEMO_POSE_COUNT = 11;
 const DEMO_MOTION_COUNT = 6;
 const MOTION_HISTORY_MS = 1300;
 const RECOGNITION_COOLDOWN_MS = 1100;
+const HAND_TRACKING_OVERSCAN = 0.05;
 
 function getDistance(pointA: { x: number; y: number }, pointB: { x: number; y: number }) {
   return Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y);
 }
 
 function getCanvasPoint(landmark: HandLandmark, width: number, height: number) {
+  const overscan = Math.max(width, height) * HAND_TRACKING_OVERSCAN;
+  const virtualWidth = width + overscan * 2;
+  const virtualHeight = height + overscan * 2;
+
   return {
-    x: (1 - landmark.x) * width,
-    y: landmark.y * height,
+    x: (1 - landmark.x) * virtualWidth - overscan,
+    y: landmark.y * virtualHeight - overscan,
   };
 }
 

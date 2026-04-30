@@ -69,6 +69,7 @@ const THROW_RELEASE_COOLDOWN_MS = 0;
 const PHYSICS_GRAVITY = 0.62;
 const PHYSICS_FRICTION = 0.994;
 const PHYSICS_BOUNCE = 0.82;
+const HAND_TRACKING_OVERSCAN = 0.05;
 const PHYSICS_SHAPE_BLUEPRINTS = [
   { id: 1, type: "circle" as const, size: 100 },
   { id: 2, type: "square" as const, size: 64 },
@@ -92,6 +93,10 @@ const handActions = [
   {
     title: "Middle finger touch thumb",
     text: "Push shapes forward and backward in depth.",
+  },
+  {
+    title: "Ring finger touch thumb",
+    text: "Duplicate a shape with a quick copy gesture.",
   },
   {
     title: "Pinky touch thumb",
@@ -132,26 +137,43 @@ export default function Home() {
   const signingPinchStartRef = useRef<number | null>(null);
   const hasNavigatedToPlaygroundRef = useRef(false);
   const hasNavigatedToSigningRef = useRef(false);
+  const mousePromptTimerRef = useRef<number | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [isMouseHoveringPlayground, setIsMouseHoveringPlayground] = useState(false);
-  const [isMouseHoveringSigning, setIsMouseHoveringSigning] = useState(false);
   const [isHandHoveringPlayground, setIsHandHoveringPlayground] = useState(false);
   const [isHandHoveringSigning, setIsHandHoveringSigning] = useState(false);
   const [playgroundPinchProgress, setPlaygroundPinchProgress] = useState(0);
   const [signingPinchProgress, setSigningPinchProgress] = useState(0);
   const [isIntroVisible, setIsIntroVisible] = useState(true);
   const [hasDetectedHands, setHasDetectedHands] = useState(false);
-  const activeDescription: ActiveDescription = isMouseHoveringPlayground
+  const [mousePrompt, setMousePrompt] = useState<string | null>(null);
+  const activeDescription: ActiveDescription = isHandHoveringPlayground
     ? "playground"
-    : isMouseHoveringSigning
+    : isHandHoveringSigning
       ? "signing"
-      : isHandHoveringPlayground
-        ? "playground"
-        : isHandHoveringSigning
-          ? "signing"
-          : null;
+      : null;
   const shouldShowActions = activeDescription === "playground";
   const shouldShowSigningActions = activeDescription === "signing";
+
+  function showMousePrompt(destination: string) {
+    setMousePrompt(`Pinch ${destination} with your hand to open it.`);
+
+    if (mousePromptTimerRef.current !== null) {
+      window.clearTimeout(mousePromptTimerRef.current);
+    }
+
+    mousePromptTimerRef.current = window.setTimeout(() => {
+      setMousePrompt(null);
+      mousePromptTimerRef.current = null;
+    }, 2600);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (mousePromptTimerRef.current !== null) {
+        window.clearTimeout(mousePromptTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const laneWidth = window.innerWidth / PHYSICS_SHAPE_BLUEPRINTS.length;
@@ -465,9 +487,13 @@ export default function Home() {
     }
 
     function getCanvasPoint(landmark: HandLandmark, width: number, height: number) {
+      const overscan = Math.max(width, height) * HAND_TRACKING_OVERSCAN;
+      const virtualWidth = width + overscan * 2;
+      const virtualHeight = height + overscan * 2;
+
       return {
-        x: (1 - landmark.x) * width,
-        y: landmark.y * height,
+        x: (1 - landmark.x) * virtualWidth - overscan,
+        y: landmark.y * virtualHeight - overscan,
       };
     }
 
@@ -702,10 +728,16 @@ export default function Home() {
           <button
             className={styles.introButton}
             type="button"
-            onClick={() => setIsIntroVisible(false)}
+            tabIndex={-1}
+            aria-disabled="true"
           >
             Got it
           </button>
+        </div>
+      )}
+      {mousePrompt && (
+        <div className={styles.mousePrompt} role="status" aria-live="polite">
+          {mousePrompt}
         </div>
       )}
       <div className={styles.buttonGroup}>
@@ -734,8 +766,12 @@ export default function Home() {
           href="/playground"
           className={`${styles.button} ${shouldShowActions ? styles.buttonActive : ""}`}
           style={{ "--pinch-progress": playgroundPinchProgress } as React.CSSProperties}
-          onMouseEnter={() => setIsMouseHoveringPlayground(true)}
-          onMouseLeave={() => setIsMouseHoveringPlayground(false)}
+          tabIndex={-1}
+          aria-disabled="true"
+          onClick={(event) => {
+            event.preventDefault();
+            showMousePrompt("Shape Playground");
+          }}
         >
           <span className={styles.buttonProgress} />
           <span className={styles.buttonLabel}>Shape Playground</span>
@@ -745,8 +781,12 @@ export default function Home() {
           href="/signing"
           className={`${styles.button} ${shouldShowSigningActions ? styles.buttonActive : ""}`}
           style={{ "--pinch-progress": signingPinchProgress } as React.CSSProperties}
-          onMouseEnter={() => setIsMouseHoveringSigning(true)}
-          onMouseLeave={() => setIsMouseHoveringSigning(false)}
+          tabIndex={-1}
+          aria-disabled="true"
+          onClick={(event) => {
+            event.preventDefault();
+            showMousePrompt("Signing");
+          }}
         >
           <span className={styles.buttonProgress} />
           <span className={styles.buttonLabel}>Signing</span>
