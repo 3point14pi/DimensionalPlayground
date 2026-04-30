@@ -269,7 +269,7 @@ export default function Signing() {
       ctx.fillStyle = "#FF0000";
 
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        setStatus("Tracking hands");
+        setStatus("Tracking hands (BUT ITS RLY BAD)");
 
         for (const landmarks of results.multiHandLandmarks) {
           const now = performance.now();
@@ -394,7 +394,7 @@ export default function Signing() {
           <span style={{ transform: `scaleX(${confidence})` }} />
         </div>
         <p className={styles.modelNote}>
-          This is not a 1,000-word sign-language model yet. Live landmarks are running, and this demo maps simple poses plus motion patterns like wave, swipe, up, down, and around. Real vocabulary recognition needs a trained sequence model.
+          ITS SO BADDDD UGHASDJFLASDFASDF... I need some time to work on it :D
         </p>
         <div className={styles.transcript}>
           {transcript.length > 0 ? transcript.join(" ") : "Detected words will appear here"}

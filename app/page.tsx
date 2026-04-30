@@ -29,6 +29,19 @@ interface MediaPipeHands {
 type HandsConstructor = new (options: {
   locateFile: (file: string) => string;
 }) => MediaPipeHands;
+type PhysicsShape = {
+  id: number;
+  type: "circle" | "square";
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  rotation: number;
+  angularVelocity: number;
+};
+type FingerPoint = { x: number; y: number; time: number };
+type FingerVelocity = { vx: number; vy: number };
 
 declare global {
   interface Window {
@@ -49,6 +62,27 @@ const THUMB_TIP = 4;
 const INDEX_TIP = 8;
 const BUTTON_PINCH_HOLD_MS = 2000;
 const BUTTON_PINCH_THRESHOLD = 50;
+const FINGER_GRAB_RADIUS = 76;
+// Raise this to make shapes stay grabbed longer; lower it to make flings release more easily.
+const THROW_RELEASE_SPEED = 360;
+const THROW_RELEASE_COOLDOWN_MS = 0;
+const PHYSICS_GRAVITY = 0.62;
+const PHYSICS_FRICTION = 0.994;
+const PHYSICS_BOUNCE = 0.82;
+const PHYSICS_SHAPE_BLUEPRINTS = [
+  { id: 1, type: "circle" as const, size: 100 },
+  { id: 2, type: "square" as const, size: 64 },
+  { id: 3, type: "circle" as const, size: 52 },
+  { id: 4, type: "square" as const, size: 56 },
+  { id: 5, type: "circle" as const, size: 64 },
+  { id: 6, type: "square" as const, size: 50 },
+  { id: 7, type: "circle" as const, size: 46 },
+  { id: 8, type: "square" as const, size: 60 },
+  { id: 9, type: "circle" as const, size: 68 },
+  { id: 10, type: "square" as const, size: 48 },
+  { id: 11, type: "circle" as const, size: 54 },
+  { id: 12, type: "square" as const, size: 66 },
+];
 
 const handActions = [
   {
@@ -81,7 +115,19 @@ export default function Home() {
   const signingButtonRef = useRef<HTMLAnchorElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationRef = useRef<number>(0);
+  const physicsAnimationRef = useRef<number>(0);
   const handsRef = useRef<MediaPipeHands | null>(null);
+  const physicsShapesRef = useRef<PhysicsShape[]>([]);
+  const physicsShapeRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const activeDragShapeIdsRef = useRef<Array<number | null>>([null, null]);
+  const indexFingerPointsRef = useRef<Array<FingerPoint | null>>([null, null]);
+  const previousIndexFingerPointsRef = useRef<Array<FingerPoint | null>>([null, null]);
+  const lastFingerVelocitiesRef = useRef<FingerVelocity[]>([
+    { vx: 0, vy: 0 },
+    { vx: 0, vy: 0 },
+  ]);
+  const lastDraggedShapeVelocitiesRef = useRef<Record<number, FingerVelocity>>({});
+  const dragReleaseUntilRef = useRef<number[]>([0, 0]);
   const playgroundPinchStartRef = useRef<number | null>(null);
   const signingPinchStartRef = useRef<number | null>(null);
   const hasNavigatedToPlaygroundRef = useRef(false);
@@ -93,6 +139,8 @@ export default function Home() {
   const [isHandHoveringSigning, setIsHandHoveringSigning] = useState(false);
   const [playgroundPinchProgress, setPlaygroundPinchProgress] = useState(0);
   const [signingPinchProgress, setSigningPinchProgress] = useState(0);
+  const [isIntroVisible, setIsIntroVisible] = useState(true);
+  const [hasDetectedHands, setHasDetectedHands] = useState(false);
   const activeDescription: ActiveDescription = isMouseHoveringPlayground
     ? "playground"
     : isMouseHoveringSigning
@@ -104,6 +152,283 @@ export default function Home() {
           : null;
   const shouldShowActions = activeDescription === "playground";
   const shouldShowSigningActions = activeDescription === "signing";
+
+  useEffect(() => {
+    const laneWidth = window.innerWidth / PHYSICS_SHAPE_BLUEPRINTS.length;
+    const shuffledLanes = PHYSICS_SHAPE_BLUEPRINTS
+      .map((_, index) => index)
+      .sort(() => Math.random() - 0.5);
+
+    physicsShapesRef.current = PHYSICS_SHAPE_BLUEPRINTS.map((shape, index) => ({
+      ...shape,
+      x: Math.min(
+        window.innerWidth - shape.size - 16,
+        Math.max(16, shuffledLanes[index] * laneWidth + laneWidth * (0.22 + Math.random() * 0.42))
+      ),
+      y: -120 - index * 96 - Math.random() * 140,
+      vx: (Math.random() - 0.5) * 4,
+      vy: Math.random() * 1.2,
+      rotation: Math.random() * 32 - 16,
+      angularVelocity: Math.random() * 4 - 2,
+    }));
+
+    function renderShape(shape: PhysicsShape) {
+      const element = physicsShapeRefs.current[shape.id];
+      if (!element) return;
+
+      element.style.transform = `translate3d(${shape.x}px, ${shape.y}px, 0) rotate(${shape.rotation}deg)`;
+    }
+
+    function tickPhysics() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const floor = height - 20;
+      const currentFingerPoints = indexFingerPointsRef.current;
+      const previousFingerPoints = previousIndexFingerPointsRef.current;
+      const fingerVelocities = currentFingerPoints.map((currentFingerPoint, handIndex) => {
+        const previousFingerPoint = previousFingerPoints[handIndex];
+
+        if (!currentFingerPoint) {
+          return lastFingerVelocitiesRef.current[handIndex] ?? { vx: 0, vy: 0 };
+        }
+
+        if (!previousFingerPoint || currentFingerPoint.time === previousFingerPoint.time) {
+          return lastFingerVelocitiesRef.current[handIndex] ?? { vx: 0, vy: 0 };
+        }
+
+        const dt = Math.max(16, currentFingerPoint.time - previousFingerPoint.time);
+        const velocity = {
+          vx: (currentFingerPoint.x - previousFingerPoint.x) / dt * 16,
+          vy: (currentFingerPoint.y - previousFingerPoint.y) / dt * 16,
+        };
+
+        lastFingerVelocitiesRef.current[handIndex] = velocity;
+        return velocity;
+      });
+      const buttonRects = [playgroundButtonRef.current, signingButtonRef.current]
+        .map((button) => button?.getBoundingClientRect())
+        .filter((rect): rect is DOMRect => Boolean(rect));
+      const activeShapeIds = [...activeDragShapeIdsRef.current];
+      const previousActiveShapeIds = [...activeShapeIds];
+      const releaseVelocities = new Map<number, FingerVelocity>();
+
+      currentFingerPoints.forEach((currentFingerPoint, handIndex) => {
+        const previousActiveShapeId = previousActiveShapeIds[handIndex];
+
+        if (!currentFingerPoint) {
+          if (previousActiveShapeId !== null) {
+            releaseVelocities.set(
+              previousActiveShapeId,
+              lastDraggedShapeVelocitiesRef.current[previousActiveShapeId] ??
+                lastFingerVelocitiesRef.current[handIndex] ??
+                { vx: 0, vy: 0 }
+            );
+          }
+
+          activeShapeIds[handIndex] = null;
+          return;
+        }
+
+        const fingerVelocity = fingerVelocities[handIndex] ?? { vx: 0, vy: 0 };
+        const speed = Math.hypot(fingerVelocity.vx, fingerVelocity.vy);
+
+        if (speed > THROW_RELEASE_SPEED) {
+          const activeShapeId = activeShapeIds[handIndex];
+          if (activeShapeId !== null) {
+            releaseVelocities.set(
+              activeShapeId,
+              lastDraggedShapeVelocitiesRef.current[activeShapeId] ?? fingerVelocity
+            );
+          }
+
+          activeShapeIds[handIndex] = null;
+          dragReleaseUntilRef.current[handIndex] = currentFingerPoint.time + THROW_RELEASE_COOLDOWN_MS;
+          return;
+        }
+
+        if (currentFingerPoint.time < dragReleaseUntilRef.current[handIndex]) {
+          activeShapeIds[handIndex] = null;
+          return;
+        }
+
+        const activeShapeId = activeShapeIds[handIndex];
+        if (activeShapeId && physicsShapesRef.current.some((shape) => shape.id === activeShapeId)) return;
+
+        const grabbedShapeIds = new Set(activeShapeIds.filter((shapeId): shapeId is number => shapeId !== null));
+        const nearestShape = physicsShapesRef.current
+          .filter((shape) => !grabbedShapeIds.has(shape.id))
+          .map((shape) => {
+            const centerX = shape.x + shape.size / 2;
+            const centerY = shape.y + shape.size / 2;
+            return {
+              shape,
+              distance: Math.hypot(currentFingerPoint.x - centerX, currentFingerPoint.y - centerY),
+            };
+          })
+          .filter(({ distance }) => distance < FINGER_GRAB_RADIUS)
+          .sort((firstShape, secondShape) => firstShape.distance - secondShape.distance)[0]?.shape;
+
+        if (nearestShape) {
+          activeShapeIds[handIndex] = nearestShape.id;
+        }
+      });
+
+      activeDragShapeIdsRef.current = activeShapeIds;
+
+      const nextShapes = physicsShapesRef.current.map((shape) => {
+        const nextShape = { ...shape };
+        const activeHandIndex = activeShapeIds.findIndex((shapeId) => shapeId === shape.id);
+        const currentFingerPoint = activeHandIndex >= 0 ? currentFingerPoints[activeHandIndex] : null;
+        const releaseVelocity = releaseVelocities.get(shape.id);
+        const fingerVelocity = activeHandIndex >= 0
+          ? fingerVelocities[activeHandIndex] ?? { vx: 0, vy: 0 }
+          : { vx: nextShape.vx, vy: nextShape.vy };
+
+        if (currentFingerPoint) {
+          nextShape.x += (currentFingerPoint.x - nextShape.size / 2 - nextShape.x) * 0.42;
+          nextShape.y += (currentFingerPoint.y - nextShape.size / 2 - nextShape.y) * 0.42;
+          nextShape.vx = fingerVelocity.vx;
+          nextShape.vy = fingerVelocity.vy;
+          lastDraggedShapeVelocitiesRef.current[shape.id] = fingerVelocity;
+          nextShape.angularVelocity = Math.max(-12, Math.min(12, fingerVelocity.vx * 0.35));
+        } else {
+          if (releaseVelocity) {
+            nextShape.vx = releaseVelocity.vx;
+            nextShape.vy = releaseVelocity.vy;
+            nextShape.angularVelocity = Math.max(-12, Math.min(12, releaseVelocity.vx * 0.35));
+          }
+
+          nextShape.vy += PHYSICS_GRAVITY;
+          nextShape.x += nextShape.vx;
+          nextShape.y += nextShape.vy;
+          nextShape.vx *= PHYSICS_FRICTION;
+          nextShape.vy *= PHYSICS_FRICTION;
+          nextShape.rotation += nextShape.angularVelocity;
+          nextShape.angularVelocity *= 0.992;
+        }
+
+        if (nextShape.x < 0) {
+          nextShape.x = 0;
+          nextShape.vx = Math.abs(nextShape.vx) * PHYSICS_BOUNCE;
+          nextShape.angularVelocity *= -0.8;
+        } else if (nextShape.x + nextShape.size > width) {
+          nextShape.x = width - nextShape.size;
+          nextShape.vx = -Math.abs(nextShape.vx) * PHYSICS_BOUNCE;
+          nextShape.angularVelocity *= -0.8;
+        }
+
+        if (!activeShapeIds.includes(shape.id)) {
+          for (const rect of buttonRects) {
+            const shapeRight = nextShape.x + nextShape.size;
+            const shapeBottom = nextShape.y + nextShape.size;
+            const isColliding = (
+              shapeRight > rect.left &&
+              nextShape.x < rect.right &&
+              shapeBottom > rect.top &&
+              nextShape.y < rect.bottom
+            );
+
+            if (!isColliding) continue;
+
+            const overlapLeft = shapeRight - rect.left;
+            const overlapRight = rect.right - nextShape.x;
+            const overlapTop = shapeBottom - rect.top;
+            const overlapBottom = rect.bottom - nextShape.y;
+            const minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom);
+
+            if (minOverlap === overlapLeft) {
+              nextShape.x = rect.left - nextShape.size;
+              nextShape.vx = -Math.abs(nextShape.vx) * PHYSICS_BOUNCE;
+            } else if (minOverlap === overlapRight) {
+              nextShape.x = rect.right;
+              nextShape.vx = Math.abs(nextShape.vx) * PHYSICS_BOUNCE;
+            } else if (minOverlap === overlapTop) {
+              nextShape.y = rect.top - nextShape.size;
+              nextShape.vy = -Math.abs(nextShape.vy) * PHYSICS_BOUNCE;
+              nextShape.vx *= 0.92;
+            } else {
+              nextShape.y = rect.bottom;
+              nextShape.vy = Math.abs(nextShape.vy) * PHYSICS_BOUNCE;
+            }
+
+            nextShape.angularVelocity += nextShape.vx * 0.12;
+          }
+        }
+
+        if (nextShape.y + nextShape.size > floor) {
+          nextShape.y = floor - nextShape.size;
+          nextShape.vy = -Math.abs(nextShape.vy) * PHYSICS_BOUNCE;
+          nextShape.vx *= 0.86;
+          nextShape.angularVelocity *= 0.82;
+        } else if (nextShape.y < 0) {
+          nextShape.y = 0;
+          nextShape.vy = Math.abs(nextShape.vy) * PHYSICS_BOUNCE;
+        }
+
+        return nextShape;
+      });
+
+      for (let firstIndex = 0; firstIndex < nextShapes.length; firstIndex++) {
+        for (let secondIndex = firstIndex + 1; secondIndex < nextShapes.length; secondIndex++) {
+          const firstShape = nextShapes[firstIndex];
+          const secondShape = nextShapes[secondIndex];
+          const firstCenterX = firstShape.x + firstShape.size / 2;
+          const firstCenterY = firstShape.y + firstShape.size / 2;
+          const secondCenterX = secondShape.x + secondShape.size / 2;
+          const secondCenterY = secondShape.y + secondShape.size / 2;
+          const dx = secondCenterX - firstCenterX;
+          const dy = secondCenterY - firstCenterY;
+          const distance = Math.max(0.001, Math.hypot(dx, dy));
+          const minDistance = (firstShape.size + secondShape.size) / 2;
+
+          if (distance >= minDistance) continue;
+
+          const nx = dx / distance;
+          const ny = dy / distance;
+          const overlap = minDistance - distance;
+          const firstGrabbed = activeShapeIds.includes(firstShape.id);
+          const secondGrabbed = activeShapeIds.includes(secondShape.id);
+
+          if (!firstGrabbed) {
+            firstShape.x -= nx * overlap * (secondGrabbed ? 1 : 0.5);
+            firstShape.y -= ny * overlap * (secondGrabbed ? 1 : 0.5);
+          }
+
+          if (!secondGrabbed) {
+            secondShape.x += nx * overlap * (firstGrabbed ? 1 : 0.5);
+            secondShape.y += ny * overlap * (firstGrabbed ? 1 : 0.5);
+          }
+
+          if (!firstGrabbed && !secondGrabbed) {
+            const firstVx = firstShape.vx;
+            const firstVy = firstShape.vy;
+
+            firstShape.vx = secondShape.vx * PHYSICS_BOUNCE;
+            firstShape.vy = secondShape.vy * PHYSICS_BOUNCE;
+            secondShape.vx = firstVx * PHYSICS_BOUNCE;
+            secondShape.vy = firstVy * PHYSICS_BOUNCE;
+            firstShape.angularVelocity += (firstShape.vx - secondShape.vx) * 0.08;
+            secondShape.angularVelocity += (secondShape.vx - firstShape.vx) * 0.08;
+          }
+        }
+      }
+
+      nextShapes.forEach(renderShape);
+      physicsShapesRef.current = nextShapes;
+      previousIndexFingerPointsRef.current = currentFingerPoints.map((point) => (
+        point ? { ...point } : null
+      ));
+      physicsAnimationRef.current = requestAnimationFrame(tickPhysics);
+    }
+
+    tickPhysics();
+
+    return () => {
+      if (physicsAnimationRef.current) {
+        cancelAnimationFrame(physicsAnimationRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const script = document.createElement("script");
@@ -189,6 +514,8 @@ export default function Home() {
       let nextIsHandHoveringSigning = false;
       let isPinchingPlayground = false;
       let isPinchingSigning = false;
+      const nextIndexFingerPoints: Array<FingerPoint | null> = [null, null];
+      const nextHasDetectedHands = Boolean(results.multiHandLandmarks?.length);
 
       ctx.save();
       ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
@@ -198,7 +525,9 @@ export default function Home() {
       ctx.fillStyle = "#FF0000";
 
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        for (const landmarks of results.multiHandLandmarks) {
+        for (let handIndex = 0; handIndex < results.multiHandLandmarks.length; handIndex++) {
+          const landmarks = results.multiHandLandmarks[handIndex];
+
           for (const [start, end] of HAND_CONNECTIONS) {
             const startPoint = getCanvasPoint(landmarks[start], width, height);
             const endPoint = getCanvasPoint(landmarks[end], width, height);
@@ -228,6 +557,13 @@ export default function Home() {
           }
 
           const buttonPinchPoint = getButtonPinchPoint(landmarks, width, height);
+          if (buttonPinchPoint && handIndex < nextIndexFingerPoints.length) {
+            nextIndexFingerPoints[handIndex] = {
+              ...indexPoint,
+              time: performance.now(),
+            };
+          }
+
           if (buttonPinchPoint && isPointInsideButton(buttonPinchPoint, playgroundButtonRef.current)) {
             nextIsHandHoveringPlayground = true;
             isPinchingPlayground = true;
@@ -240,6 +576,8 @@ export default function Home() {
         }
       }
 
+      indexFingerPointsRef.current = nextIndexFingerPoints;
+      setHasDetectedHands(nextHasDetectedHands);
       setIsHandHoveringPlayground(nextIsHandHoveringPlayground);
       setIsHandHoveringSigning(nextIsHandHoveringSigning);
       if (isPinchingPlayground && !hasNavigatedToPlaygroundRef.current) {
@@ -328,6 +666,47 @@ export default function Home() {
         playsInline
       />
       <canvas ref={canvasRef} className={styles.handCanvas} />
+      <div className={styles.physicsLayer} aria-hidden="true">
+        {PHYSICS_SHAPE_BLUEPRINTS.map((shape) => (
+          <div
+            key={shape.id}
+            ref={(element) => {
+              physicsShapeRefs.current[shape.id] = element;
+            }}
+            className={`${styles.physicsShape} ${
+              shape.type === "circle"
+                ? styles.physicsShapeCircle
+                : styles.physicsShapeSquare
+            }`}
+            style={{
+              width: `${shape.size}px`,
+              height: `${shape.size}px`,
+            }}
+          />
+        ))}
+      </div>
+      {isIntroVisible && !hasDetectedHands && (
+        <div className={styles.introPopup} role="dialog" aria-label="Camera hand tracking tip">
+          <div className={styles.introHand} aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className={styles.introText}>
+            <strong>USE YOUR HANDS</strong>
+            <span>Hover a button with your hand, then pinch and hold to jump in.</span>
+          </div>
+          <button
+            className={styles.introButton}
+            type="button"
+            onClick={() => setIsIntroVisible(false)}
+          >
+            Got it
+          </button>
+        </div>
+      )}
       <div className={styles.buttonGroup}>
         {shouldShowActions && (
           <div className={styles.actionPanel}>

@@ -1,0 +1,30 @@
+.homeLink {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 100300;
+  display: grid;
+  place-items: center;
+  height: 34px;
+  width: 34px;
+  border: 2px solid #111827;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 90%);
+  color: #111827;
+  font: 900 18px/1 Arial, Helvetica, sans-serif;
+  text-decoration: none;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 16%);
+  transition: opacity 180ms ease;
+}
+
+.homeLinkVisible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.homeLink:hover {
+  background: #111827;
+  color: #ffffff;
+}
