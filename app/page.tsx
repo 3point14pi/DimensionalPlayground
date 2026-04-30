@@ -697,6 +697,7 @@ export default function Home() {
           <div className={styles.introText}>
             <strong>USE YOUR HANDS</strong>
             <span>Hover a button with your hand, then pinch and hold to jump in.</span>
+            <span>Also pinch and throw the shapes around on the home screen!</span>
           </div>
           <button
             className={styles.introButton}
