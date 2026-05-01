@@ -91,7 +91,7 @@ interface HandTrackingProps {
   onTutorialGesture?: (gesture: TutorialGesture) => void;
 }
 
-export type TutorialGesture = "drag" | "resize" | "zoom" | "depth" | "duplicate" | "delete";
+export type TutorialGesture = "drag" | "resize" | "zoom" | "depth" | "duplicate" | "delete" | "clear";
 
 function isShapeType(value: unknown): value is ShapeType {
   return value === "rectangle" || value === "circle" || value === "triangle";
@@ -1089,6 +1089,7 @@ export default function HandTracking({ onReplayTutorial, onTutorialGesture }: Ha
 
         if (elapsed >= FIST_CLEAR_DURATION_MS && !fistClearedRef.current) {
           fistClearedRef.current = true;
+          reportTutorialGesture("clear");
           clearAllShapes();
         }
       } else {

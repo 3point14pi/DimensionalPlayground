@@ -229,6 +229,20 @@
   animation: tutorialDeletePulse 2.2s ease-in-out infinite;
 }
 
+.tutorialDemo[data-step="clear"] .tutorialRectangle {
+  animation: tutorialRectangleClear 3s ease-in-out infinite;
+}
+
+.tutorialDemo[data-step="clear"] .tutorialDuplicateRectangle {
+  animation: tutorialDuplicateClear 3s ease-in-out infinite;
+}
+
+.tutorialDemo[data-step="clear"] .tutorialFingerOne,
+.tutorialDemo[data-step="clear"] .tutorialFingerTwo {
+  opacity: 1;
+  animation: tutorialFistClear 3s ease-in-out infinite;
+}
+
 .tutorialCopy {
   display: grid;
   gap: 12px;
@@ -476,6 +490,37 @@
   45%, 64% {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+@keyframes tutorialRectangleClear {
+  0%, 62%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  78%, 90% {
+    opacity: 0;
+    transform: scale(0.62) rotate(-8deg);
+  }
+}
+
+@keyframes tutorialDuplicateClear {
+  0%, 62%, 100% {
+    opacity: 1;
+    transform: translate(42px, 34px) scale(0.9);
+  }
+  78%, 90% {
+    opacity: 0;
+    transform: translate(42px, 34px) scale(0.56) rotate(8deg);
+  }
+}
+
+@keyframes tutorialFistClear {
+  0%, 100% {
+    transform: translateY(0) scale(0.92);
+  }
+  35%, 78% {
+    transform: translateY(-16px) scale(1.08);
   }
 }
 

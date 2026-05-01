@@ -53,8 +53,16 @@ const tutorialSteps = [
     title: "Delete",
     text: "Place your hand over a shape and touch your pinky to your thumb. The shape should disappear immediately when the pinky pinch lands on it.",
     requirement: "Delete a real shape with a pinky pinch.",
-    success: "Deleted. Tutorial complete.",
+    success: "Deleted. Pinky pinch removes one shape.",
     gesture: "delete",
+  },
+  {
+    id: "clear",
+    title: "Clear all",
+    text: "Make fists with both hands and hold them up together. Keep both fists closed until the countdown finishes and every shape clears.",
+    requirement: "Hold two fists for the full clear countdown.",
+    success: "Cleared. Tutorial complete.",
+    gesture: "clear",
   },
 ] satisfies Array<{
   id: TutorialGesture;
